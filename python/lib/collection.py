@@ -111,6 +111,8 @@ class Collection():
             self.cursor.execute("UPDATE {} SET is_blacklisted={} WHERE word='{}'"
                                 .format(self.words_table, 1, word))
 
+        self.con.commit()
+
     def get_comic(self, number):
         """Return a comic from the collection.
 
