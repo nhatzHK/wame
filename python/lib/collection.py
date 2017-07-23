@@ -10,7 +10,6 @@ class Collection():
         self.__word_weights_table = "word_weights"
 
         self.__con = self.__connect(file_path)
-        self.__cursor = self.__con.cursor()
 
     def __del__(self):
         self.__con.commit()
@@ -64,10 +63,11 @@ class Collection():
                 "transcript": string
             }
         """
-        self.__cursor.execute('INSERT INTO {} (id, img_url, title, alt, transcript) VALUES (?,?,?,?,?)'
-                              .format(self.__comics_table),
-                              (comic["number"], comic["img_url"], comic["title"],
-                                comic["alt"], comic["transcript"]))
+        cursor = self.__con.cursor()
+        cursor.execute('INSERT INTO {} (id, img_url, title, alt, transcript) VALUES (?,?,?,?,?)'
+                       .format(self.__comics_table),
+                       (comic["number"], comic["img_url"], comic["title"],
+                        comic["alt"], comic["transcript"]))
 
         phrase = '{} {} {}'.format(comic["title"], comic["alt"], comic["transcript"]).split(' ')
 
@@ -75,34 +75,34 @@ class Collection():
             word = word.lower()
             # Add the word to the database if it isn't already there.
 
-            self.__cursor.execute('SELECT id FROM {} WHERE word = ?'
-                                  .format(self.__words_table), (word,))
+            cursor.execute('SELECT id FROM {} WHERE word = ?'
+                           .format(self.__words_table), (word,))
 
-            res = self.__cursor.fetchone()
+            res = cursor.fetchone()
             word_id = 0
             if res is None:
-                self.__cursor.execute('INSERT INTO {} (word) VALUES (?)'
-                                      .format(self.__words_table), (word,))
-                word_id = self.__cursor.lastrowid
+                cursor.execute('INSERT INTO {} (word) VALUES (?)'
+                               .format(self.__words_table), (word,))
+                word_id = cursor.lastrowid
             else:
                 word_id = res[0]
 
             # Update the weight of the word for this comic.
 
-            self.__cursor.execute('SELECT weight FROM {} WHERE word_id=? AND comic_id=?'
-                                  .format(self.__word_weights_table),
-                                  (word_id, comic["number"]))
+            cursor.execute('SELECT weight FROM {} WHERE word_id=? AND comic_id=?'
+                           .format(self.__word_weights_table),
+                           (word_id, comic["number"]))
 
-            res = self.__cursor.fetchone()
+            res = cursor.fetchone()
 
             if res is None:
-                self.__cursor.execute('INSERT INTO {} (word_id, comic_id) VALUES (?,?)'
-                                      .format(self.__word_weights_table),
-                                      (word_id, comic["number"]))
+                cursor.execute('INSERT INTO {} (word_id, comic_id) VALUES (?,?)'
+                               .format(self.__word_weights_table),
+                               (word_id, comic["number"]))
             else:
-                self.__cursor.execute('UPDATE {} SET weight=? WHERE word_id=? AND comic_id=?'
-                                      .format(self.__word_weights_table),
-                                      (res[0] + 1, word_id, comic["number"]))
+                cursor.execute('UPDATE {} SET weight=? WHERE word_id=? AND comic_id=?'
+                               .format(self.__word_weights_table),
+                               (res[0] + 1, word_id, comic["number"]))
 
         self.__con.commit()
 
@@ -114,13 +114,14 @@ class Collection():
         :param word: A word to blacklist. This can be a new word or one that is already
             in the collection
         """
+        cursor = self.__con.cursor()
         word = word.lower()
         try:
-            self.__cursor.execute('INSERT INTO {} (word, is_blacklisted) VALUES (?,?)'
-                                  .format(self.__words_table), (word, 1))
+            cursor.execute('INSERT INTO {} (word, is_blacklisted) VALUES (?,?)'
+                           .format(self.__words_table), (word, 1))
         except:
-            self.__cursor.execute('UPDATE {} SET is_blacklisted=? WHERE word=?'
-                                  .format(self.__words_table), (1, word))
+            cursor.execute('UPDATE {} SET is_blacklisted=? WHERE word=?'
+                           .format(self.__words_table), (1, word))
 
         self.__con.commit()
 
@@ -132,17 +133,19 @@ class Collection():
         :param number: An integer that uniquely identifies the comic
         :return: Either the comic matching the number or None if it is not in the collection
         """
-        self.__cursor.execute('SELECT * FROM {} WHERE id = ?'
-                              .format(self.__comics_table), (number,))
-        return self.__row_to_comic(self.__cursor.fetchone())
+        cursor = self.__con.cursor()
+        cursor.execute('SELECT * FROM {} WHERE id = ?'
+                       .format(self.__comics_table), (number,))
+        return self.__row_to_comic(cursor.fetchone())
 
     def get_latest(self):
         """Return the latest comic from the collection.
 
         :return: The latest comic or None if the collection is empty
         """
-        self.__cursor.execute('SELECT * FROM {} ORDER BY id DESC LIMIT 1'.format(self.__comics_table))
-        return self.__row_to_comic(self.__cursor.fetchone())
+        cursor = self.__con.cursor()
+        cursor.execute('SELECT * FROM {} ORDER BY id DESC LIMIT 1'.format(self.__comics_table))
+        return self.__row_to_comic(cursor.fetchone())
 
     def __row_to_comic(self, row):
         """Turn a cursor's row result into a comic or None if the row is empty."""
@@ -162,21 +165,22 @@ class Collection():
         :param phrase: A list of words that describes a comic
         :return: Either the comic matching the number or None if it is not in the collection
         """
+        cursor = self.__con.cursor()
         # comic's number => total word weight
         comics = dict()
 
         # Find the comics that mention words in phrase.
         for word in phrase:
             word = word.lower()
-            self.__cursor.execute('SELECT id FROM {} WHERE word=? AND is_blacklisted=0'
-                                  .format(self.__words_table), (word,))
-            res = self.__cursor.fetchone()
+            cursor.execute('SELECT id FROM {} WHERE word=? AND is_blacklisted=0'
+                           .format(self.__words_table), (word,))
+            res = cursor.fetchone()
             if res is None:
                 continue
 
-            self.__cursor.execute('SELECT comic_id, weight FROM {} WHERE word_id=?'
-                                  .format(self.__word_weights_table), (res[0],))
-            for row in self.__cursor.fetchall():
+            cursor.execute('SELECT comic_id, weight FROM {} WHERE word_id=?'
+                           .format(self.__word_weights_table), (res[0],))
+            for row in cursor.fetchall():
                 comic_id = row[0]
                 weight = row[1]
                 if comic_id in comics:
