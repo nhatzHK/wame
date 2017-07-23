@@ -86,6 +86,34 @@ class TestCollection(unittest.TestCase):
 
         os.remove(file_name)
 
+    def test_get_random_nonempty(self):
+        """get_random should return a comic if the collection is not empty.
+
+        #TODO: This doesn't check for randomness
+        """
+        file_name = "./{}.sqlite".format(str(uuid.uuid4()))
+        db = Collection(file_name)
+
+        db.add_comic({
+            "number": 0,
+            "img_url": "https://www.google.com",
+            "title": "A Title",
+            "alt": "Some alt-text",
+            "transcript": "Hoi hoi"
+        })
+
+        self.assertIsNotNone(db.get_random())
+
+        os.remove(file_name)
+
+    def test_get_random_empty(self):
+        """get_random should return None if the collection is empty."""
+        file_name = "./{}.sqlite".format(str(uuid.uuid4()))
+        db = Collection(file_name)
+
+        self.assertIsNone(db.get_random())
+        os.remove(file_name)
+
     def test_get_from_phrase(self):
         """get_from_phrase should return the comic that is most similar to the phrase."""
         file_name = "./{}.sqlite".format(str(uuid.uuid4()))

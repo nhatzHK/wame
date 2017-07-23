@@ -147,6 +147,12 @@ class Collection():
         cursor.execute('SELECT * FROM {} ORDER BY id DESC LIMIT 1'.format(self.__comics_table))
         return self.__row_to_comic(cursor.fetchone())
 
+    def get_random(self):
+        """Returns a random comic from the collection or None if it is empty."""
+        cursor = self.__con.cursor()
+        cursor.execute('SELECT * FROM {} ORDER BY RANDOM() LIMIT 1'.format(self.__comics_table))
+        return self.__row_to_comic(cursor.fetchone())
+
     def __row_to_comic(self, row):
         """Turn a cursor's row result into a comic or None if the row is empty."""
         if row is None:
