@@ -122,16 +122,26 @@ class Collection():
         :return: Either the comic matching the number or None if it is not in the collection
         """
         self.__cursor.execute('SELECT * FROM {} WHERE id = {}'.format(self.__comics_table, number))
-        res = self.__cursor.fetchone()
+        return self.__row_to_comic(self.__cursor.fetchone())
 
-        if res is None:
+    def get_latest(self):
+        """Return the latest comic from the collection.
+
+        :return: The latest comic or None if the collection is empty
+        """
+        self.__cursor.execute('SELECT * FROM {} ORDER BY id DESC LIMIT 1'.format(self.__comics_table))
+        return self.__row_to_comic(self.__cursor.fetchone())
+
+    def __row_to_comic(self, row):
+        """Turn a cursor's row result into a comic or None if the row is empty."""
+        if row is None:
             return None
         return {
-            "number": res[0],
-            "img_url": res[1],
-            "title": res[2],
-            "alt": res[3],
-            "transcript": res[4]
+            "number": row[0],
+            "img_url": row[1],
+            "title": row[2],
+            "alt": row[3],
+            "transcript": row[4]
         }
 
     def get_from_phrase(self, phrase):

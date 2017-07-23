@@ -60,6 +60,32 @@ class TestCollection(unittest.TestCase):
         self.assertIsNotNone(comic)
         os.remove(file_name)
 
+    def test_get_latest(self):
+        file_name = "./{}.sqlite".format(str(uuid.uuid4()))
+        db = Collection(file_name)
+        latest = 10
+
+        for num in range(1, latest + 1):
+            db.add_comic({
+                "number": num,
+                "img_url": "https://www.google.com",
+                "title": "A Title",
+                "alt": "Some alt-text",
+                "transcript": "Hoi hoi"
+            })
+        db.add_comic({
+            "number": 0,
+            "img_url": "https://www.google.com",
+            "title": "A Title",
+            "alt": "Some alt-text",
+            "transcript": "Hoi hoi"
+        })
+
+        comic = db.get_latest()
+        self.assertEqual(comic["number"], latest)
+
+        os.remove(file_name)
+
     def test_get_from_phrase(self):
         """get_from_phrase should return the comic that is most similar to the phrase."""
         file_name = "./{}.sqlite".format(str(uuid.uuid4()))
