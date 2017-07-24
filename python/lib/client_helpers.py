@@ -103,12 +103,13 @@ async def parse_args (msg, prefix):
 # the words in the phrase list.
 async def get_xkcd (phrase, db):
     if len (phrase) == 1 and phrase [0].isdigit ():
-        if int(phrase[0]) <= db.get_latest()['number']:
-            comic = db.get_comic(int(phrase[0]))
-            return {'status': -1 if comic is None else 0, 'comic': comic}
+        comic = db.get_comic(int(phrase[0]))
+        if comic is not None:
+            return {'status': 0, 'comic': comic}
         else:
             online_check = await get_online_xkcd(number = phrase[0])
             if online_check['status'] is 0:
+                db.add_comic(online_check['comic'])
                 return online_check
 
     comic = db.get_from_phrase(phrase)
