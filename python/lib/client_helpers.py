@@ -3,6 +3,7 @@ import json
 import random
 import discord
 from collection import Collection
+from urllib.request import urlopen
 
 def is_someone (msg):
     return True
@@ -102,12 +103,16 @@ async def parse_args (msg, prefix):
 # the words in the phrase list.
 async def get_xkcd (phrase, db):
     if len (phrase) == 1 and phrase [0].isdigit ():
-            # TODO: Search remotely if the comic number is not here.
+        if int(phrase[0]) <= db.get_latest()['number']:
             comic = db.get_comic(int(phrase[0]))
-            return [-1 if comic is None else 0, comic]
+            return {'status': -1 if comic is None else 0, 'comic': comic}
+        else:
+            online_check = await get_online_xkcd(number = phrase[0])
+            if online_check['status'] is 0:
+                return online_check
 
     comic = db.get_from_phrase(phrase)
-    return [-1 if comic is None else 0, comic]
+    return {'status': -1 if comic is None else 0, 'comic': comic}
 
 # Clean up the query then call get_xkcd
 async def search (q, db):
@@ -118,8 +123,20 @@ async def search (q, db):
     return await get_xkcd (qlist, db)
 
 async def create_embed (comic):
+    #FIXME: Issue #11 
+    if 'url' in list (comic.keys()):
+        img_url = comic['img_url']
+        img_url = "https://" + img_url
+    else:
+        img_url = comic['img_url']
+    
+    if 'number' in list (comic.keys ()):
+        comic_number = comic['number']
+    else:
+        comic_number = comic['num']
+
     embed_comic = discord.Embed \
-            (title = '{}: {}'.format (comic['number'], comic['title']),
+            (title = '{}: {}'.format (comic_number, comic['title']), \
             colour = discord.Colour(0x00ff00),
             url = comic['img_url'])
 
@@ -129,6 +146,8 @@ async def create_embed (comic):
 
     return embed_comic
 
+#FIXME: This is some kind of a special madness, I don't remember having
+#coded while drunk
 async def report_embed (msg, report):
     t = 'Report -> {}'.format (report['type'])
     c = report['color']
@@ -144,3 +163,31 @@ async def report_embed (msg, report):
     embed_report = discord.Embed (title = t, description = d, colour = c)
 
     return embed_report
+
+async def get_online_xkcd(number = 0):
+    if number is 0:
+        url ='https://xkcd.com/info.0.json'
+    else:
+        url = 'https://xkcd.com/{}/info.0.json'.format (number)
+
+    response = {'status': 0, 'comic': ""}
+    
+    try:
+        online_comic = urlopen(url).read()
+        if type(online_comic) is bytes:
+            online_comic = online_comic.decode('utf-8')
+
+        # TODO: Use one key name for all comic image URLs.
+        # This will probably fix itself when a Comic class is created.
+        comic = json.loads(online_comic)
+        response['comic'] = {
+            'number': comic['num'],
+            'img_url': comic['img'],  # The reason this is necessary
+            'title': comic['title'],
+            'alt': comic['alt'],
+            'transcript': comic['transcript']
+        }
+    except:
+        response['status'] = -1
+
+    return response

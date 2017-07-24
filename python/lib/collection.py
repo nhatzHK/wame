@@ -72,7 +72,7 @@ class Collection():
             }
         """
         cursor = self.__con.cursor()
-        cursor.execute('INSERT INTO {} (id, img_url, title, alt, transcript) VALUES (?,?,?,?,?)'
+        cursor.execute('INSERT OR IGNORE INTO {} (id, img_url, title, alt, transcript) VALUES (?,?,?,?,?)'
                        .format(self.__comics_table),
                        (comic["number"], comic["img_url"], comic["title"],
                         comic["alt"], comic["transcript"]))

@@ -83,11 +83,12 @@ async def on_message (message):
                     embed_comic = await CLIENT.create_embed(comic)
                     await Wame.edit_message (tmp, ' ', embed = embed_comic)
             else:
-                comic = await CLIENT.search (' '.join(args), db)
+                result = await CLIENT.search (' '.join(args), db)
                 # 0 == comic found
-                if comic[0] == 0:
+                if result['status'] == 0:
                     # Create embed
-                    embed_comic = await CLIENT.create_embed (comic[1])
+                    embed_comic = await \
+                            CLIENT.create_embed (result['comic'])
                     await Wame.edit_message (tmp, ' ', embed = embed_comic)
                 else:
                     # It hasn't been found, too bad
@@ -118,15 +119,16 @@ async def on_message (message):
                 await Wame.send_message(message.channel, embed=embed_comic)
 
         elif command == 'latest':
-            # TODO: Check xkcd for a newer comic than what is kept locally.
-            latest_local_comic = db.get_latest()
-            print(latest_local_comic['img_url'])
-            if latest_local_comic is not None:
-                embed_comic = await CLIENT.create_embed (latest_local_comic)
-                await Wame.send_message (message.channel, embed = embed_comic)
+            online_latest = await CLIENT.get_online_xkcd ()
+            if online_latest['status'] is 0:
+                db.add_comic(online_latest['comic'])
+                embed_comic = await \
+                        CLIENT.create_embed(online_latest['comic'])
             else:
-                await Wame.send_message(message.channel, EMPTY_COLLECTION_MSG)
-
+                local_latest = db.get_latest()
+                embed_comic = await \
+                        CLIENT.create_embed (local_latest)
+            await Wame.send_message (message.channel, embed = embed_comic)
         elif command == 'report':
             bug_channel = Wame.get_channel (wame_config['report_channel'])
             embed_report = await CLIENT.report_embed (message, \
