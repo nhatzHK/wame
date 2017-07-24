@@ -1,5 +1,7 @@
 import sqlite3
 import os
+import random
+import xkcd_helpers as XKCD
 
 class Collection():
     """Collection manages local comics and ranking information."""
@@ -69,9 +71,13 @@ class Collection():
                        (comic["number"], comic["img_url"], comic["title"],
                         comic["alt"], comic["transcript"]))
 
-        phrase = '{} {} {}'.format(comic["title"], comic["alt"], comic["transcript"]).split(' ')
+        blob = '{} {} {}'.format(comic["title"], comic["alt"], comic["transcript"])
+        blob = XKCD.removePunk(blob)
 
-        for word in phrase:
+        words = list(blob.split(' '))
+        words = [x for x in words if x and not (x == ' ')]
+
+        for word in words:
             word = word.lower()
             # Add the word to the database if it isn't already there.
 
@@ -172,30 +178,55 @@ class Collection():
         :return: Either the comic matching the number or None if it is not in the collection
         """
         cursor = self.__con.cursor()
-        # comic's number => total word weight
-        comics = dict()
+        matched = dict()
 
-        # Find the comics that mention words in phrase.
+        # Comics gain ranking if they contain words found in the phrase.
         for word in phrase:
             word = word.lower()
-            cursor.execute('SELECT id FROM {} WHERE word=? AND is_blacklisted=0'
+
+            cursor.execute('SELECT id FROM {} WHERE word=?'
                            .format(self.__words_table), (word,))
-            res = cursor.fetchone()
-            if res is None:
-                continue
+            id_row = cursor.fetchone()
 
-            cursor.execute('SELECT comic_id, weight FROM {} WHERE word_id=?'
-                           .format(self.__word_weights_table), (res[0],))
-            for row in cursor.fetchall():
-                comic_id = row[0]
-                weight = row[1]
-                if comic_id in comics:
-                    comics[comic_id] += weight
-                else:
-                    comics[comic_id] = weight
+            if id_row:  # Word exists. Find all comics that use it.
+                cursor.execute('SELECT comic_id, weight FROM {} WHERE word_id=?'
+                               .format(self.__word_weights_table), (id_row[0],))
 
-        # Get the comic that mentioned the most words.
-        sorted_comics = sorted(comics.items(), reverse=True, key=lambda x: x[1])
-        if len(sorted_comics) == 0:
+                weights = dict()
+                for row in cursor.fetchall():
+                    weights[row[0]] = row[1]
+                self.__combine_weights(matched, weights)
+
+        if len(matched) > 0:
+            max_score = matched \
+                [max(matched, key=lambda x: matched[x]['score'])]['score']
+            a = {x: matched[x] for x in matched if matched[x]['score'] == max_score}
+
+            max_weight = a[max(a, key=lambda x: a[x]['weight'])]['weight']
+            b = {x: a[x] for x in a if a[x]['weight'] == max_weight}
+
+            return self.get_comic(random.choice(list(b.keys())))
+        else:
             return None
-        return self.get_comic(sorted_comics.pop()[0])
+
+    def __combine_weights(self, main, comic_weights):
+        """Join comic weights into a main score group.
+
+        :param main: The main collection of comics and their weights/scores
+            {
+                comic_number: {'weight': int, 'score': int}
+            }
+        :param comic_weights: Comics and their weights
+            {
+                comic_number: int <- This is the weight, not the score
+            }
+        """
+        comic_nums = list(comic_weights.keys())
+        for num in comic_nums:
+            if num in main:
+                main[num]['weight'] = main[num]['weight'] + comic_weights[num]
+            else:
+                main[num] = {'weight': comic_weights[num], 'score': 0}
+
+        for num in list(set(comic_nums)):
+            main[num]['score'] += 1

@@ -1,6 +1,7 @@
 import unittest
 import uuid
 import os
+import sqlite3
 from collection import Collection
 
 class TestCollection(unittest.TestCase):
@@ -31,14 +32,27 @@ class TestCollection(unittest.TestCase):
         """Adding valid comic structures should not throw an exception."""
         file_name = "./{}.sqlite".format(str(uuid.uuid4()))
 
+        word = 'woosh'
+        comic_num = 4
+
         db = Collection(file_name)
         db.add_comic({
-            "number":     4,
+            "number":     comic_num,
             "img_url":    "https://www.google.com",
             "title":      "A Title",
             "alt":        "Some alt-text",
-            "transcript": "Hoi hoi"
+            "transcript": "{} {}".format(word, word)
         })
+
+        # Make sure word weights are incremented.
+        con = sqlite3.connect(file_name)
+        cursor = con.cursor()
+        cursor.execute('SELECT weight FROM word_weights \
+                       WHERE word_id=(SELECT id FROM words WHERE word=?) \
+                       AND comic_id=?', (word, comic_num))
+
+        self.assertEqual(cursor.fetchone()[0], 2)
+        con.close()
 
         os.remove(file_name)
 
@@ -131,7 +145,7 @@ class TestCollection(unittest.TestCase):
             "img_url": "https://www.google.com",
             "title": "A Title",
             "alt": "Some alt-text",
-            "transcript": "Hoi hoi, mijn vrienden. Zei ik hoi? Hoi."
+            "transcript": "Hoi hoi mijn vrienden. Zei ik hoi? Hoi"
         })
 
         comic = db.get_from_phrase(["The", "hoi", "one"])
