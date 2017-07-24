@@ -7,6 +7,12 @@ class Collection():
     """Collection manages local comics and ranking information."""
 
     def __init__(self, file_path):
+        """Open a connection to a comic collection.
+
+        :param file_path: The pathname of the program's sqlite3 database
+            If the database does not exist, one will be created with
+            appropriate schema information.
+        """
         self.__comics_table = "comics"
         self.__words_table = "words"
         self.__word_weights_table = "word_weights"
