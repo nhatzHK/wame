@@ -133,12 +133,13 @@ class TestCollection(unittest.TestCase):
         file_name = "./{}.sqlite".format(str(uuid.uuid4()))
 
         db = Collection(file_name)
+        db.add_to_blacklist('or')
         db.add_comic({
             "number": 1,
             "img_url": "https://www.google.com",
             "title": "A Title",
             "alt": "Some alt-text",
-            "transcript": "Hoi hoi"
+            "transcript": "or Hoi hoi or or or or or or"
         })
         db.add_comic({
             "number": 2,

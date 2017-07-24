@@ -195,6 +195,11 @@ class Collection():
             id_row = cursor.fetchone()
 
             if id_row:  # Word exists. Find all comics that use it.
+                cursor.execute('SELECT is_blacklisted FROM {} WHERE id=?'
+                               .format(self.__words_table), (id_row[0],))
+                if cursor.fetchone()[0] == 1:
+                    continue
+
                 cursor.execute('SELECT comic_id, weight FROM {} WHERE word_id=?'
                                .format(self.__word_weights_table), (id_row[0],))
 
