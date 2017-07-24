@@ -2,6 +2,7 @@ import asyncio
 import json
 import random
 import discord
+from collection import Collection
 
 def is_someone (msg):
     return True
@@ -92,85 +93,41 @@ async def parse_args (msg, prefix):
     args = [a for a in args if a] # Take a wild guess: you missed. Try harder.
     return args
 
-# Search for a comic in the index and return it's number
-# Highest: greatest number of words from the query
-#       and greatest weight in absolute 'comic': [weight, score]
-# We prefer a greater score
-# i.e query = "kek lol haha"
-# index: "kek": {'1': 1, '2': 1, '4': 3},
-#        "lol": {'2': 2, '5': 1, '9': 2},
-#       "haha": {'1': 2, '3': 4, '6': 1}
-# resulting score:  '1': [3, 2], '2': [3, 2], '3': [4, 1], '4': [3, 1]
-#                   '5': [1, 1], '6': [1, 1], '9': [2, 1]
-# We first select the comic with the greatest score:
-#   '1': [3, 2], '2': [3, 2]
-# Then select the ones with greated weight:
-#   '1': [3, 2], '2': [3, 2]
-# Return one of them (1|2)
-async def get_xkcd (phrase, index, refs):
+# TODO: Determine effectiveness for direct title search.
+# get_xkcd may not provide the best result if they already know
+# the comic title in advance.
+
+# Retrieve the comic that best matches the phrase.
+# "Best" is defined as the one with contents most similar to
+# the words in the phrase list.
+async def get_xkcd (phrase, db):
     if len (phrase) == 1 and phrase [0].isdigit ():
-        if int (phrase[0]) <=  len (refs):
-            return [0, phrase [0]]
+            # TODO: Search remotely if the comic number is not here.
+            comic = db.get_comic(int(phrase[0]))
+            return [-1 if comic is None else 0, comic]
 
-    matched = dict ()
-    score = dict ()
-    for word in phrase:
-        if word in index:
-            m = index[word]
-            await combine (matched, m)
-    
-    if len (matched) > 0:
-        max_score = matched \
-                [max (matched, key = lambda x: matched[x]['score'])]['score']
-        a = {x: matched[x] for x in matched if matched[x]['score'] == max_score}
-
-        max_weight = a [max (a, key = lambda x: a[x]['weight'])]['weight']
-        b = {x: a[x] for x in a if a[x]['weight'] == max_weight}
-        
-        return [0, random.choice (list(b.keys()))]
-    else:
-        return [-1]
-
-# a: dict, b: dict
-# for each key in b:
-#   if the key is in a:
-#       add their value
-#   else: 
-#       a[key] = b[key], aka create the key in a with the same  value as in b
-async def combine (a, b):
-    bk = list (b.keys ())
-    for k in bk:
-        if k in a:
-            a[k]['weight'] = a[k]['weight'] + b[k]
-        else:
-            a[k] = {'weight': b[k], 'score': 0}
-
-    for k in list (set (bk)):
-        a[k]['score'] += 1
+    comic = db.get_from_phrase(phrase)
+    return [-1 if comic is None else 0, comic]
 
 # Clean up the query then call get_xkcd
-async def search (q, index, refs, bl):
+async def search (q, db):
     import xkcd_helpers as XKCD
     query = XKCD.removePunk (q)
     qlist = list (set (query.split (' ')))
-    qlist = [x for x in qlist if x and not (x in bl or x == ' ')]
-    return await get_xkcd (qlist, index, refs)
+    qlist = [x for x in qlist if x and not (x == ' ')]
+    return await get_xkcd (qlist, db)
 
 async def create_embed (comic):
     embed_comic = discord.Embed \
-            (title = '{}: {}'.format (comic['number'], comic['title']), \
-            colour = discord.Colour(0x00ff00), \
-            url = 'https://{}'.format (comic['url']))
+            (title = '{}: {}'.format (comic['number'], comic['title']),
+            colour = discord.Colour(0x00ff00),
+            url = comic['img_url'])
 
     embed_comic.set_footer (text = '{}'.format (comic['alt']))
-    embed_comic.set_image (url = 'https://{}'.format (comic['url']))
-    embed_comic.set_author (name = 'xkcd', url = 'https://xkcd.com')
+    embed_comic.set_image (url = comic['img_url'])
+    embed_comic.set_author (name = 'xkcd', url = 'https://xkcd.com/{}/'.format(comic['number']))
 
     return embed_comic
-
-async def random_embed (refs):
-    return await create_embed \
-            (refs [random.choice (list (refs.keys()))])
 
 async def report_embed (msg, report):
     t = 'Report -> {}'.format (report['type'])
