@@ -175,9 +175,8 @@ async def get_online_xkcd(number = 0):
     
     try:
         online_comic = urlopen(url).read()
-        if type(online_comic) is bytes:
-            online_comic = online_comic.decode('utf-8')
-
+        comic = json.loads(online_comic.decode('utf-8'))
+        
         # TODO: Use one key name for all comic image URLs.
         # This will probably fix itself when a Comic class is created.
         comic = json.loads(online_comic)
