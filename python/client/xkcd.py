@@ -20,25 +20,25 @@ else:
 
 sys.path.insert (0, PATH['lib'])
 import client_helpers as CLIENT
+from collection import Collection
 
 JSON = PATH['json']
+
+# It's not too much of an issue if it's not there; it will be created.
+# We hope the base db with the imported blacklist exists, though.
+db = Collection(JSON + 'collection.sqlite')
+
 # Yep you should rename your config.json and append priv to it
 # This way you won't add even more private stuff on github
 CONFIG = JSON + "xkcd.config.json.priv"
-INDEX = JSON + "xkcd.index.json"
-REF = JSON + "xkcd.references.json"
-BL = JSON + "xkcd.common.json"
+
+# This is displayed to the channel if requests need comics but
+# the collection is empty.
+EMPTY_COLLECTION_MSG = "My collection is empty :("
 
 logging.basicConfig (level = logging.INFO)
 
-wame_config = dict ()
-xkcd_index = dict ()
-xkcd_refs = dict ()
-
 wame_config = CLIENT.loadJson (CONFIG)
-xkcd_index = CLIENT.loadJson (INDEX)
-xkcd_refs = CLIENT.loadJson (REF)
-blk_list = CLIENT.loadJson (BL)
 
 wame_help = discord.Embed \
         (title = wame_config['help']['title'], \
@@ -72,11 +72,18 @@ async def on_message (message):
             tmp = await Wame.send_message (message.channel, 'Searching...')
 
             if len (args) is 0:
-                embed_comic = await CLIENT.random_embed (xkcd_refs)
-                await Wame.edit_message (tmp, ' ', embed = embed_comic)
+                # TODO: Create function for random comic -> embed process.
+                # This process is repeated a few times here; replace it with
+                # a function call.
+
+                comic = db.get_random()
+                if comic is None:
+                    await Wame.edit_message(tmp, EMPTY_COLLECTION_MSG)
+                else:
+                    embed_comic = await CLIENT.create_embed(comic)
+                    await Wame.edit_message (tmp, ' ', embed = embed_comic)
             else:
-                result = await CLIENT.search \
-                    (' '.join(args), xkcd_index, xkcd_refs, blk_list)
+                result = await CLIENT.search (' '.join(args), db)
                 # 0 == comic found
                 if result['status'] == 0:
                     # Create embed
@@ -94,22 +101,31 @@ async def on_message (message):
                             (author = message.author, \
                             content = "random", timeout = 20)
                     if (msg):
-                        embed_comic = await CLIENT.random_embed (xkcd_refs)
-                        await Wame.send_message \
-                                (message.channel, embed = embed_comic)
+                        comic = db.get_random()
+                        if comic is None:
+                            await Wame.edit_message(tmp, EMPTY_COLLECTION_MSG)
+                        else:
+                            embed_comic = await CLIENT.create_embed(comic)
+                            await Wame.send_message(message.channel, embed = embed_comic)
                     else:
                         await Wame.edit_message (tmp, "Timeout")
+
         elif command == 'random':
-            embed_comic = await CLIENT.random_embed (xkcd_refs)
-            await Wame.send_message (message.channel, embed = embed_comic)
+            comic = db.get_random()
+            if comic is None:
+                await Wame.send_message(message.channel, EMPTY_COLLECTION_MSG)
+            else:
+                embed_comic = await CLIENT.create_embed(comic)
+                await Wame.send_message(message.channel, embed=embed_comic)
+
         elif command == 'latest':
             online_latest = await CLIENT.get_online_xkcd ()
-            
-            if online_latest['status'] is 0: 
+            if online_latest['status'] is 0:
+                db.add_comic(online_latest['comic'])
                 embed_comic = await \
                         CLIENT.create_embed(online_latest['comic'])
             else:
-                local_latest = xkcd_refs[str(max(list(map(int, xkcd_refs))))]
+                local_latest = db.get_latest()
                 embed_comic = await \
                         CLIENT.create_embed (local_latest)
             await Wame.send_message (message.channel, embed = embed_comic)
@@ -119,6 +135,7 @@ async def on_message (message):
                     {'type': 'User', 'color': (0xff0000), 'client': Wame})
             report = await Wame.send_message (bug_channel, embed = embed_report)
             await Wame.pin_message (report)
+
         elif command == 'help':
             await Wame.send_message (message.channel, \
                     embed = wame_help)
